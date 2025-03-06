@@ -1,0 +1,474 @@
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;	Main: 8Queens solution with loops (no backtracking/recursive)
+;	For 1802 CPU (RCA 2020 SBC)
+;	Version: 0.9
+;	Date: March 3, 2025
+;	Author: Richard van Harderwijk
+;
+;	Doc: https://github.com/richardvanharderwijk/1802-8Queens
+;	Note: this code is cross-compiled by hand from my TI-59 implementation, 
+;	which has no recursive capability, so looping with DSZ (Decrement and Skip on Zero) 
+;	and 'strange' label names (mathematical functions)
+;
+;	No fancy error checking in this code
+;	
+;	Uses: SCRT, UT4 (read, type, delay)
+;
+;	Register use:
+;	R(0) not used
+;	R(1) not used
+;	R(2) X / SP
+;	R(3) PC
+;	R(4) SCRT call
+;	R(5) SCRT return
+;	R(6) SCRT arguments passing
+;	R(7) temp 
+;	R(8) R(8).0 return value from functions
+;	R(9) pointer to 8 Queens row.column values
+;	R(A) R(A).0 candidate row
+;	R(B) R(B).0 candidate column
+;	R(C) UT4 use
+;	R(D) UT4 use: read hex, assembled into by READAH
+;	R(E) UT4 use
+;	R(F) UT4 use: R(F).1 holds input/output ASCII char
+;
+;	Queens stored in byte at pointer R(9): row=high nibble; column=low nibble
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+.org $0000
+
+variables: 
+UT4_TYPE    .set 0xC2A4
+UT4_TYPE2   .set 0xC2AE
+UT4_READAH  .set 0xC23B
+UT4_START   .set 0xC100
+
+;
+; enter here at $0000 with X, P = 0, 0 via UT4 (int disabled) 
+;
+init:
+LDI 0x7F			; init stack/X in R2
+PLO 2
+LDI 0xFE
+PHI 2
+SEX 2
+;
+LDI 0x00			; init PC in R3
+PHI 3
+LDI 0x0E			
+PLO 3
+SEP 3
+;
+LDI 0xC3			; init SCRT call in R4, return in R5
+PHI 4
+PHI 5
+LDI 0x01
+PLO 4
+LDI 0x11
+PLO 5
+;
+LDI 0x7F			; init pointer to 8Queens position values in R9
+PHI 9
+LDI 0x08
+PLO 9
+;
+;
+; print first message
+;
+print_begin_msg:
+LDI 0x00			; init pointer to text to print
+PHI 7		   
+LDI 0x76
+PLO 7
+;
+print1:
+LDA 7               ; get byte to print and put in R(F).1
+PHI F
+BZ cont1            ; exit if byte = 0x00 (EOF)
+SEP 4
+dw UT4_TYPE         ; SCRT to UT4: TYPE @ 0xC2A4
+BR print1
+cont1:
+;
+;
+; input first queen/ 2 x READAH
+;
+SEP 4
+dw UT4_READAH       ; SCRT to UT4: READAH @ 0xC23B
+SEP 4
+dw UT4_READAH       ; SCRT to UT4: READAH @ 0xC23B
+;
+GLO D				; store 8th queen position in @R(9)
+STR 9
+DEC 9				; decrement pointer to 7 the queen location					
+;
+SEP C		    	; call UT4.DELAY (after READ), returns w/ SEP 3
+db 0x7F				; constant for DELAY
+
+
+;
+; print second message
+;
+LDI 0x00			; init pointer to text to print
+PHI 7		        ; print 'calculating' message 
+LDI 0xCE
+PLO 7
+;
+print2:
+LDA 7               ; get byte to print and put in R(F).1
+PHI F
+BZ cont2            ; exit if byte = 0x00 (EOF)
+SEP 4
+dw UT4_TYPE         ; SCRT to UT4: TYPE @ 0xC2A4
+BR print2
+cont2:
+;
+;
+;
+; calculate 8Q solution
+SEP 4               ; SCRT to main routine
+dw start_calculation      
+;
+;
+; 8Q solution ready
+; print solution: 8 x print hex pair +  0x0D, 0x0A
+;
+LDI 0x08
+PLO 9
+PLO 7
+print_8q_loop:
+LDN 9				; print hex pair value
+PHI F
+SEP 4
+dw UT4_TYPE2	    ; SCRT to UT4: TYPE2 @ 0xC2AE
+LDI 0x0D
+PHI F
+SEP 4
+dw UT4_TYPE         ; SCRT to UT4: TYPE @ 0xC2A4
+LDI 0x0A
+PHI F
+SEP 4
+dw UT4_TYPE         ; SCRT to UT4: TYPE @ 0xC2A4
+DEC 9
+DEC 7				; DSZ (Decrement and Skip on Zero)/loop
+GLO 7
+BNZ print_8q_loop
+
+; 
+; print third message
+;
+LDI 0x00			; init pointer to text to print
+PHI 7		   
+LDI 0xE0
+PLO 7
+;
+print3:
+LDA 7               ; get byte to print and put in R(F).1
+PHI F
+BZ cont3            ; exit if byte = 0x00 (EOF)
+SEP 4
+dw UT4_TYPE         ; SCRT to UT4: TYPE @ 0xC2A4
+BR print3
+cont3:
+;
+;
+;
+end_8Q:
+LBR UT4_START	   	; Jump to UT4
+;
+;
+
+
+begin_txt:
+db  0x0D, 0x0A, "8-Queens problem.", 0x0D, 0x0A, "Enter first Queen position (two numbers 1..8 for row and column): ", 0x00
+
+calculating_txt:
+db 0x0D, 0x0A,  "Calculating: ", 0x0D, 0x0A, 0x00
+
+end_txt:
+db 0x0D, 0x0A,  "Ready. Press return.", 0x0D, 0x0A, 0x00
+
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;	Main-Function: 8Queens - solution with loops (no backtracking/recursive)
+;	For 1802 CPU (RCA 2020 SBC)
+;
+;	Pre: 
+;	Post on success: 
+;	Post on error: 
+;	
+;	End with SCRT return D5
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.org $0100
+
+start_calculation:
+;
+sqr:
+LDI 0x08			; candidate row = 8
+PLO A
+;
+sqr_root:
+SEP 4				; SCRT to function check_valid_row
+dw check_valid_row		
+GLO 8
+BZ yx				; if not valid_row, then branch to next row
+LDI 0x08			; if valid_row, continue, candidate column = 8
+PLO B
+;
+pr:
+GLO A				; put row.column in candidate queen @R(9)
+SHL 
+SHL
+SHL
+SHL
+STXD
+IRX
+GLO B
+ADD
+STR 9
+;
+SEP 4				; SCRT to function check_valid_field
+dw check_valid_field	
+GLO 8
+BNZ reciproke		; if valid_field, then branch to next row
+GLO B				; if not valid_field, continue
+SMI 0x02
+BDF logx            ; is BGE
+INC 9				; one queen back ('backtrack')
+LDN 9
+ANI 0x0F			; get column of backtracked queen 
+SMI 0x02
+BDF absx			; (BGE) if last column of backtracked queen?
+INC 9				; then another queen backtrack
+;	
+absx:
+LDN 9				; put row.column of backtracked queen
+SHR					; in candidate row and candidate column
+SHR
+SHR
+SHR
+PLO A
+LDN 9
+ANI 0x0F
+PLO B
+;
+logx:
+DEC B				; DSZ (Decrement and Skip on Zero): next column
+GLO B
+BNZ pr
+;
+yx:
+DEC A				; DSZ (Decrement and Skip on Zero): next row
+GLO A
+BNZ sqr_root
+;
+;
+reciproke:
+;					; optional, print backtrack info/depth of queen
+;
+GLO 9				; print #Queen ('backtrack' depth)
+PHI F
+SEP 4
+dw UT4_TYPE2	    ; SCRT to UT4: TYPE2 @ 0xC2AE
+LDI 0x0D
+PHI F
+SEP 4
+dw UT4_TYPE         ; SCRT to UT4: TYPE @ 0xC2A4
+LDI 0x0A
+PHI F
+SEP 4
+dw UT4_TYPE         ; SCRT to UT4: TYPE @ 0xC2A4
+;
+;
+;
+lnx:
+DEC 9				; DSZ (Decrement and Skip on Zero) queen
+GLO 9
+BNZ sqr
+;
+;
+;
+LDI 0x0A
+PHI F
+SEP 4
+dw UT4_TYPE         ; SCRT to UT4: TYPE @ 0xC2A4
+;
+;					; solution ready, 
+SEP 5				; return with SCRT D5
+;
+
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;	Sub-Function: 8Queens - check_valid_row
+;	For 1802 CPU (RCA 2020 SBC)
+;
+;	Pre: 
+;	Post on success: 
+;	Post on error: 
+;	
+;	End with SCRT return D5
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+check_valid_row:
+LDI 0x08			; init temp pointer to Queens - R(7)
+PLO 7	
+GHI 9
+PHI 7
+;
+sinus:
+GLO 7				; compare candidate (subtract), if reached the candidate Q
+STXD				; then no false return occurred in the DSZ loop 
+IRX					; means true return
+GLO 9
+SD
+BZ return_true_row
+;
+LDN 7				; test on row candidate queen
+SHR					; subtract result zero means other queen on the row 
+SHR					; return with false
+SHR
+SHR
+STXD
+IRX
+GLO A
+SD
+BZ return_false_row
+;
+DEC 7				; DSZ test next queen row
+GLO 7
+BNZ sinus			; when all rows tested/end of DSZ, return with true
+;
+;
+return_true_row:
+LDI 0x01			; R(8).0 = 1 (true)
+PLO 8
+SEP 5
+;
+return_false_row:
+LDI 0x00			; R(8).0 = 0 (false)
+PLO 8
+SEP 5
+;
+;
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;	Sub-Function: 8Queens - check_valid_field
+;	For 1802 CPU (RCA 2020 SBC)
+;
+;	Pre: 
+;	Post on success: 
+;	Post on error: 
+;	
+;	End with SCRT return D5
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+check_valid_field:
+LDI 0x08			; init temp pointer to Queens - R(7)
+PLO 7	
+GHI 9
+PHI 7
+;
+sto:
+GLO 7				; test if queens above candidate tested
+STXD				; if yes, return true
+IRX
+GLO 9
+SD
+BZ return_true_field
+;
+LDN 7				; test if queen on equal column
+ANI 0x0F			; if yes, return false
+STXD
+IRX
+GLO B
+SD
+BZ return_false_field
+;
+LDN 7				; test1 diagonals by
+SHR					; adding row + column number  
+SHR					; if the same for candidate and queen already set
+SHR					; return with false
+SHR
+STXD
+IRX
+LDN 7
+ANI 0x0F
+ADD
+STXD
+IRX
+GLO A
+SD
+STXD
+IRX
+GLO B
+SD
+BZ return_false_field
+;
+LDN 7				; test2 diagonals by
+SHR					; subtracting row - column number  
+SHR					; if the same for candidate and queen already set
+SHR					; return with false
+SHR					; (row1-column1) - (row2-column2) = 0
+STXD				; <=> row1-column1-row2+column2 = 0
+IRX
+LDN 7
+ANI 0x0F
+SD
+STXD
+IRX
+GLO A
+SD
+STXD
+IRX
+GLO B
+ADD
+BZ return_false_field
+;
+DEC 7				; DSZ test next
+GLO 7				; if all tested/end of DSZ, return with true
+BNZ sto
+;
+;
+return_true_field:
+LDI 0x01			; R(8).0 = 1 (true)
+PLO 8
+SEP 5
+;
+return_false_field:
+LDI 0x00			; R(8).0 = 0 (false)
+PLO 8
+SEP 5
+;
+;
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,507 @@
+0000                             ; 
+0000                             ; 
+0000                             ;	Main: 8Queens solution with loops (no backtracking/recursive)
+0000                             ;	For 1802 CPU (RCA 2020 SBC)
+0000                             ;	Version: 0.9
+0000                             ;	Date: March 3, 2025
+0000                             ;	Author: Richard van Harderwijk
+0000                             ; 
+0000                             ;	Doc: https://github.com/richardvanharderwijk/1802-8Queens
+0000                             ;	Note: this code is cross-compiled by hand from my TI-59 implementation,
+0000                             ;	which has no recursive capability, so looping with DSZ (Decrement and Skip on Zero)
+0000                             ;	and "strange" label names (mathematical functions)
+0000                             ; 
+0000                             ;	No fancy error checking in this code
+0000                             ;	
+0000                             ;	Uses: SCRT, UT4 (read, type, delay)
+0000                             ; 
+0000                             ;	Register use:
+0000                             ;	R(0) not used
+0000                             ;	R(1) not used
+0000                             ;	R(2) X / SP
+0000                             ;	R(3) PC
+0000                             ;	R(4) SCRT call
+0000                             ;	R(5) SCRT return
+0000                             ;	R(6) SCRT arguments passing
+0000                             ;	R(7) temp
+0000                             ;	R(8) R(8).0 return value from functions
+0000                             ;	R(9) pointer to 8 Queens row.column values
+0000                             ;	R(A) R(A).0 candidate row
+0000                             ;	R(B) R(B).0 candidate column
+0000                             ;	R(C) UT4 use
+0000                             ;	R(D) UT4 use: read hex, assembled into by READAH
+0000                             ;	R(E) UT4 use
+0000                             ;	R(F) UT4 use: R(F).1 holds input/output ASCII char
+0000                             ; 
+0000                             ;	Queens stored in byte at pointer R(9): row=high nibble; column=low nibble
+0000                             ; 
+0000                             ; 
+0000                          .ORG   $0000   
+0000                VARIABLES:      
+0000                UT4_TYPE:   .SET   0xC2A4   
+0000                UT4_TYPE2:   .SET   0xC2AE   
+0000                UT4_READAH:   .SET   0xC23B   
+0000                UT4_START:   .SET   0xC100   
+0000                             ; 
+0000                             ; enter here at $0000 with X, P = 0, 0 via UT4 (int disabled)
+0000                             ; 
+0000                INIT:        
+0000   F8 7F                  LDI   0x7F   ; init stack/X in R2
+0002   A2                     PLO   2   
+0003   F8 FE                  LDI   0xFE   
+0005   B2                     PHI   2   
+0006   E2                     SEX   2   
+0007                             ; 
+0007   F8 00                  LDI   0x00   ; init PC in R3
+0009   B3                     PHI   3   
+000A   F8 0E                  LDI   0x0E   
+000C   A3                     PLO   3   
+000D   D3                     SEP   3   
+000E                             ; 
+000E   F8 C3                  LDI   0xC3   ; init SCRT call in R4, return in R5
+0010   B4                     PHI   4   
+0011   B5                     PHI   5   
+0012   F8 01                  LDI   0x01   
+0014   A4                     PLO   4   
+0015   F8 11                  LDI   0x11   
+0017   A5                     PLO   5   
+0018                             ; 
+0018   F8 7F                  LDI   0x7F   ; init pointer to 8Queens position values in R9
+001A   B9                     PHI   9   
+001B   F8 08                  LDI   0x08   
+001D   A9                     PLO   9   
+001E                             ; 
+001E                             ; 
+001E                             ; print first message
+001E                             ; 
+001E                PRINT_BEGIN_MSG:      
+001E   F8 00                  LDI   0x00   ; init pointer to text to print
+0020   B7                     PHI   7   
+0021   F8 76                  LDI   0x76   
+0023   A7                     PLO   7   
+0024                             ; 
+0024                PRINT1:      
+0024   47                     LDA   7   ; get byte to print and put in R(F).1
+0025   BF                     PHI   F   
+0026   32 2D                  BZ   cont1   ; exit if byte = 0x00 (EOF)
+0028   D4                     SEP   4   
+0029   C2 A4                  DW   UT4_TYPE   ; SCRT to UT4: TYPE @ 0xC2A4
+002B   30 24                  BR   print1   
+002D                CONT1:       
+002D                             ; 
+002D                             ; 
+002D                             ; input first queen/ 2 x READAH
+002D                             ; 
+002D   D4                     SEP   4   
+002E   C2 3B                  DW   UT4_READAH   ; SCRT to UT4: READAH @ 0xC23B
+0030   D4                     SEP   4   
+0031   C2 3B                  DW   UT4_READAH   ; SCRT to UT4: READAH @ 0xC23B
+0033                             ; 
+0033   8D                     GLO   D   ; store 8th queen position in @R(9)
+0034   59                     STR   9   
+0035   29                     DEC   9   ; decrement pointer to 7 the queen location					
+0036                             ; 
+0036   DC                     SEP   C   ; call UT4.DELAY (after READ), returns w/ SEP 3
+0037   7F                     DB   0x7F   ; constant for DELAY
+0038                             ; 
+0038                             ; print second message
+0038                             ; 
+0038   F8 00                  LDI   0x00   ; init pointer to text to print
+003A   B7                     PHI   7   ; print "calculating" message
+003B   F8 CE                  LDI   0xCE   
+003D   A7                     PLO   7   
+003E                             ; 
+003E                PRINT2:      
+003E   47                     LDA   7   ; get byte to print and put in R(F).1
+003F   BF                     PHI   F   
+0040   32 47                  BZ   cont2   ; exit if byte = 0x00 (EOF)
+0042   D4                     SEP   4   
+0043   C2 A4                  DW   UT4_TYPE   ; SCRT to UT4: TYPE @ 0xC2A4
+0045   30 3E                  BR   print2   
+0047                CONT2:       
+0047                             ; 
+0047                             ; 
+0047                             ; 
+0047                             ; calculate 8Q solution
+0047   D4                     SEP   4   ; SCRT to main routine
+0048   01 00                  DW   start_calculation   
+004A                             ; 
+004A                             ; 
+004A                             ; 8Q solution ready
+004A                             ; print solution: 8 x print hex pair +  0x0D, 0x0A
+004A                             ; 
+004A   F8 08                  LDI   0x08   
+004C   A9                     PLO   9   
+004D   A7                     PLO   7   
+004E                PRINT_8Q_LOOP:      
+004E   09                     LDN   9   ; print hex pair value
+004F   BF                     PHI   F   
+0050   D4                     SEP   4   
+0051   C2 AE                  DW   UT4_TYPE2   ; SCRT to UT4: TYPE2 @ 0xC2AE
+0053   F8 0D                  LDI   0x0D   
+0055   BF                     PHI   F   
+0056   D4                     SEP   4   
+0057   C2 A4                  DW   UT4_TYPE   ; SCRT to UT4: TYPE @ 0xC2A4
+0059   F8 0A                  LDI   0x0A   
+005B   BF                     PHI   F   
+005C   D4                     SEP   4   
+005D   C2 A4                  DW   UT4_TYPE   ; SCRT to UT4: TYPE @ 0xC2A4
+005F   29                     DEC   9   
+0060   27                     DEC   7   ; DSZ (Decrement and Skip on Zero)/loop
+0061   87                     GLO   7   
+0062   3A 4E                  BNZ   print_8q_loop   
+0064                             ; 
+0064                             ; print third message
+0064                             ; 
+0064   F8 00                  LDI   0x00   ; init pointer to text to print
+0066   B7                     PHI   7   
+0067   F8 E0                  LDI   0xE0   
+0069   A7                     PLO   7   
+006A                             ; 
+006A                PRINT3:      
+006A   47                     LDA   7   ; get byte to print and put in R(F).1
+006B   BF                     PHI   F   
+006C   32 73                  BZ   cont3   ; exit if byte = 0x00 (EOF)
+006E   D4                     SEP   4   
+006F   C2 A4                  DW   UT4_TYPE   ; SCRT to UT4: TYPE @ 0xC2A4
+0071   30 6A                  BR   print3   
+0073                CONT3:       
+0073                             ; 
+0073                             ; 
+0073                             ; 
+0073                END_8Q:      
+0073   C0 C1 00               LBR   UT4_START   ; Jump to UT4
+0076                             ; 
+0076                             ; 
+0076                BEGIN_TXT:      
+0076   0D 0A 38 2D 51 75 65 65 6E 73 20 70 72 6F 62 6C 65 6D 2E 0D 0A 45 6E 74 65 72 20 66 69 72 73 74 20 51 75 65 65 6E 20 70 6F 73 69 74 69 6F 6E 20 28 74 77 6F 20 6E 75 6D 62 65 72 73 20 31 2E 2E 38 20 66 6F 72 20 72 6F 77 20 61 6E 64 20 63 6F 6C 75 6D 6E 29 3A 20 00 DB   0x0D,0x0A,"8-Queens problem.",0x0D,0x0A,"Enter first Queen position (two numbers 1..8 for row and column): ",0x00   
+00CE                CALCULATING_TXT:      
+00CE   0D 0A 43 61 6C 63 75 6C 61 74 69 6E 67 3A 20 0D 0A 00 DB   0x0D,0x0A,"Calculating: ",0x0D,0x0A,0x00   
+00E0                END_TXT:      
+00E0   0D 0A 52 65 61 64 79 2E 20 50 72 65 73 73 20 72 65 74 75 72 6E 2E 0D 0A 00 DB   0x0D,0x0A,"Ready. Press return.",0x0D,0x0A,0x00   
+00F9                             ; 
+00F9                             ; 
+00F9                             ;	Main-Function: 8Queens - solution with loops (no backtracking/recursive)
+00F9                             ;	For 1802 CPU (RCA 2020 SBC)
+00F9                             ; 
+00F9                             ;	Pre:
+00F9                             ;	Post on success:
+00F9                             ;	Post on error:
+00F9                             ;	
+00F9                             ;	End with SCRT return D5
+00F9                             ; 
+00F9                             ; 
+0100                          .ORG   $0100   
+0100                START_CALCULATION:      
+0100                             ; 
+0100                SQR:         
+0100   F8 08                  LDI   0x08   ; candidate row = 8
+0102   AA                     PLO   A   
+0103                             ; 
+0103                SQR_ROOT:      
+0103   D4                     SEP   4   ; SCRT to function check_valid_row
+0104   01 58                  DW   check_valid_row   
+0106   88                     GLO   8   
+0107   32 38                  BZ   yx   ; if not valid_row, then branch to next row
+0109   F8 08                  LDI   0x08   ; if valid_row, continue, candidate column = 8
+010B   AB                     PLO   B   
+010C                             ; 
+010C                PR:          
+010C   8A                     GLO   A   ; put row.column in candidate queen @R(9)
+010D   FE                     SHL      
+010E   FE                     SHL      
+010F   FE                     SHL      
+0110   FE                     SHL      
+0111   73                     STXD      
+0112   60                     IRX      
+0113   8B                     GLO   B   
+0114   F4                     ADD      
+0115   59                     STR   9   
+0116                             ; 
+0116   D4                     SEP   4   ; SCRT to function check_valid_field
+0117   01 7B                  DW   check_valid_field   
+0119   88                     GLO   8   
+011A   3A 3C                  BNZ   reciproke   ; if valid_field, then branch to next row
+011C   8B                     GLO   B   ; if not valid_field, continue
+011D   FF 02                  SMI   0x02   
+011F   33 34                  BDF   logx   ; is BGE
+0121   19                     INC   9   ; one queen back ("backtrack")
+0122   09                     LDN   9   
+0123   FA 0F                  ANI   0x0F   ; get column of backtracked queen
+0125   FF 02                  SMI   0x02   
+0127   33 2A                  BDF   absx   ; (BGE) if last column of backtracked queen?
+0129   19                     INC   9   ; then another queen backtrack
+012A                             ;	
+012A                ABSX:        
+012A   09                     LDN   9   ; put row.column of backtracked queen
+012B   F6                     SHR      ; in candidate row and candidate column
+012C   F6                     SHR      
+012D   F6                     SHR      
+012E   F6                     SHR      
+012F   AA                     PLO   A   
+0130   09                     LDN   9   
+0131   FA 0F                  ANI   0x0F   
+0133   AB                     PLO   B   
+0134                             ; 
+0134                LOGX:        
+0134   2B                     DEC   B   ; DSZ (Decrement and Skip on Zero): next column
+0135   8B                     GLO   B   
+0136   3A 0C                  BNZ   pr   
+0138                             ; 
+0138                YX:          
+0138   2A                     DEC   A   ; DSZ (Decrement and Skip on Zero): next row
+0139   8A                     GLO   A   
+013A   3A 03                  BNZ   sqr_root   
+013C                             ; 
+013C                             ; 
+013C                RECIPROKE:      
+013C                             ;					; optional, print backtrack info/depth of queen
+013C                             ; 
+013C   89                     GLO   9   ; print #Queen ("backtrack" depth)
+013D   BF                     PHI   F   
+013E   D4                     SEP   4   
+013F   C2 AE                  DW   UT4_TYPE2   ; SCRT to UT4: TYPE2 @ 0xC2AE
+0141   F8 0D                  LDI   0x0D   
+0143   BF                     PHI   F   
+0144   D4                     SEP   4   
+0145   C2 A4                  DW   UT4_TYPE   ; SCRT to UT4: TYPE @ 0xC2A4
+0147   F8 0A                  LDI   0x0A   
+0149   BF                     PHI   F   
+014A   D4                     SEP   4   
+014B   C2 A4                  DW   UT4_TYPE   ; SCRT to UT4: TYPE @ 0xC2A4
+014D                             ; 
+014D                             ; 
+014D                             ; 
+014D                LNX:         
+014D   29                     DEC   9   ; DSZ (Decrement and Skip on Zero) queen
+014E   89                     GLO   9   
+014F   3A 00                  BNZ   sqr   
+0151                             ; 
+0151                             ; 
+0151                             ; 
+0151   F8 0A                  LDI   0x0A   
+0153   BF                     PHI   F   
+0154   D4                     SEP   4   
+0155   C2 A4                  DW   UT4_TYPE   ; SCRT to UT4: TYPE @ 0xC2A4
+0157                             ; 
+0157                             ;					; solution ready,
+0157   D5                     SEP   5   ; return with SCRT D5
+0158                             ; 
+0158                             ; 
+0158                             ; 
+0158                             ;	Sub-Function: 8Queens - check_valid_row
+0158                             ;	For 1802 CPU (RCA 2020 SBC)
+0158                             ; 
+0158                             ;	Pre:
+0158                             ;	Post on success:
+0158                             ;	Post on error:
+0158                             ;	
+0158                             ;	End with SCRT return D5
+0158                             ; 
+0158                             ; 
+0158                CHECK_VALID_ROW:      
+0158   F8 08                  LDI   0x08   ; init temp pointer to Queens - R(7)
+015A   A7                     PLO   7   
+015B   99                     GHI   9   
+015C   B7                     PHI   7   
+015D                             ; 
+015D                SINUS:       
+015D   87                     GLO   7   ; compare candidate (subtract), if reached the candidate Q
+015E   73                     STXD      ; then no false return occurred in the DSZ loop
+015F   60                     IRX      ; means true return
+0160   89                     GLO   9   
+0161   F5                     SD      
+0162   32 73                  BZ   return_true_row   
+0164                             ; 
+0164   07                     LDN   7   ; test on row candidate queen
+0165   F6                     SHR      ; subtract result zero means other queen on the row
+0166   F6                     SHR      ; return with false
+0167   F6                     SHR      
+0168   F6                     SHR      
+0169   73                     STXD      
+016A   60                     IRX      
+016B   8A                     GLO   A   
+016C   F5                     SD      
+016D   32 77                  BZ   return_false_row   
+016F                             ; 
+016F   27                     DEC   7   ; DSZ test next queen row
+0170   87                     GLO   7   
+0171   3A 5D                  BNZ   sinus   ; when all rows tested/end of DSZ, return with true
+0173                             ; 
+0173                             ; 
+0173                RETURN_TRUE_ROW:      
+0173   F8 01                  LDI   0x01   ; R(8).0 = 1 (true)
+0175   A8                     PLO   8   
+0176   D5                     SEP   5   
+0177                             ; 
+0177                RETURN_FALSE_ROW:      
+0177   F8 00                  LDI   0x00   ; R(8).0 = 0 (false)
+0179   A8                     PLO   8   
+017A   D5                     SEP   5   
+017B                             ; 
+017B                             ; 
+017B                             ; 
+017B                             ; 
+017B                             ;	Sub-Function: 8Queens - check_valid_field
+017B                             ;	For 1802 CPU (RCA 2020 SBC)
+017B                             ; 
+017B                             ;	Pre:
+017B                             ;	Post on success:
+017B                             ;	Post on error:
+017B                             ;	
+017B                             ;	End with SCRT return D5
+017B                             ; 
+017B                             ; 
+017B                CHECK_VALID_FIELD:      
+017B   F8 08                  LDI   0x08   ; init temp pointer to Queens - R(7)
+017D   A7                     PLO   7   
+017E   99                     GHI   9   
+017F   B7                     PHI   7   
+0180                             ; 
+0180                STO:         
+0180   87                     GLO   7   ; test if queens above candidate tested
+0181   73                     STXD      ; if yes, return true
+0182   60                     IRX      
+0183   89                     GLO   9   
+0184   F5                     SD      
+0185   32 BE                  BZ   return_true_field   
+0187                             ; 
+0187   07                     LDN   7   ; test if queen on equal column
+0188   FA 0F                  ANI   0x0F   ; if yes, return false
+018A   73                     STXD      
+018B   60                     IRX      
+018C   8B                     GLO   B   
+018D   F5                     SD      
+018E   32 C2                  BZ   return_false_field   
+0190                             ; 
+0190   07                     LDN   7   ; test1 diagonals by
+0191   F6                     SHR      ; adding row + column number
+0192   F6                     SHR      ; if the same for candidate and queen already set
+0193   F6                     SHR      ; return with false
+0194   F6                     SHR      
+0195   73                     STXD      
+0196   60                     IRX      
+0197   07                     LDN   7   
+0198   FA 0F                  ANI   0x0F   
+019A   F4                     ADD      
+019B   73                     STXD      
+019C   60                     IRX      
+019D   8A                     GLO   A   
+019E   F5                     SD      
+019F   73                     STXD      
+01A0   60                     IRX      
+01A1   8B                     GLO   B   
+01A2   F5                     SD      
+01A3   32 C2                  BZ   return_false_field   
+01A5                             ; 
+01A5   07                     LDN   7   ; test2 diagonals by
+01A6   F6                     SHR      ; subtracting row - column number
+01A7   F6                     SHR      ; if the same for candidate and queen already set
+01A8   F6                     SHR      ; return with false
+01A9   F6                     SHR      ; (row1-column1) - (row2-column2) = 0
+01AA   73                     STXD      ; <=> row1-column1-row2+column2 = 0
+01AB   60                     IRX      
+01AC   07                     LDN   7   
+01AD   FA 0F                  ANI   0x0F   
+01AF   F5                     SD      
+01B0   73                     STXD      
+01B1   60                     IRX      
+01B2   8A                     GLO   A   
+01B3   F5                     SD      
+01B4   73                     STXD      
+01B5   60                     IRX      
+01B6   8B                     GLO   B   
+01B7   F4                     ADD      
+01B8   32 C2                  BZ   return_false_field   
+01BA                             ; 
+01BA   27                     DEC   7   ; DSZ test next
+01BB   87                     GLO   7   ; if all tested/end of DSZ, return with true
+01BC   3A 80                  BNZ   sto   
+01BE                             ; 
+01BE                             ; 
+01BE                RETURN_TRUE_FIELD:      
+01BE   F8 01                  LDI   0x01   ; R(8).0 = 1 (true)
+01C0   A8                     PLO   8   
+01C1   D5                     SEP   5   
+01C2                             ; 
+01C2                RETURN_FALSE_FIELD:      
+01C2   F8 00                  LDI   0x00   ; R(8).0 = 0 (false)
+01C4   A8                     PLO   8   
+01C5   D5                     SEP   5   
+01C6                             ; 
+01C6                             ; 
+
+
+VARIABLES:          0000 DEFINED AT LINE 44
+UT4_TYPE:           C2A4 DEFINED AT LINE 45
+                    > USED AT LINE 93
+                    > USED AT LINE 126
+                    > USED AT LINE 151
+                    > USED AT LINE 155
+                    > USED AT LINE 174
+                    > USED AT LINE 286
+                    > USED AT LINE 290
+                    > USED AT LINE 304
+UT4_TYPE2:          C2AE DEFINED AT LINE 46
+                    > USED AT LINE 147
+                    > USED AT LINE 282
+UT4_READAH:         C23B DEFINED AT LINE 47
+                    > USED AT LINE 101
+                    > USED AT LINE 103
+UT4_START:          C100 DEFINED AT LINE 48
+                    > USED AT LINE 181
+INIT:               0000 DEFINED AT LINE 53
+PRINT_BEGIN_MSG:    001E DEFINED AT LINE 82
+PRINT1:             0024 DEFINED AT LINE 88
+                    > USED AT LINE 94
+CONT1:              002D DEFINED AT LINE 95
+                    > USED AT LINE 91
+PRINT2:             003E DEFINED AT LINE 121
+                    > USED AT LINE 127
+CONT2:              0047 DEFINED AT LINE 128
+                    > USED AT LINE 124
+PRINT_8Q_LOOP:      004E DEFINED AT LINE 143
+                    > USED AT LINE 159
+PRINT3:             006A DEFINED AT LINE 169
+                    > USED AT LINE 175
+CONT3:              0073 DEFINED AT LINE 176
+                    > USED AT LINE 172
+END_8Q:             0073 DEFINED AT LINE 180
+BEGIN_TXT:          0076 DEFINED AT LINE 186
+CALCULATING_TXT:    00CE DEFINED AT LINE 189
+END_TXT:            00E0 DEFINED AT LINE 192
+START_CALCULATION:  0100 DEFINED AT LINE 214
+                    > USED AT LINE 134
+SQR:                0100 DEFINED AT LINE 216
+                    > USED AT LINE 297
+SQR_ROOT:           0103 DEFINED AT LINE 220
+                    > USED AT LINE 273
+PR:                 010C DEFINED AT LINE 228
+                    > USED AT LINE 268
+ABSX:               012A DEFINED AT LINE 254
+                    > USED AT LINE 251
+LOGX:               0134 DEFINED AT LINE 265
+                    > USED AT LINE 246
+YX:                 0138 DEFINED AT LINE 270
+                    > USED AT LINE 224
+RECIPROKE:          013C DEFINED AT LINE 276
+                    > USED AT LINE 243
+LNX:                014D DEFINED AT LINE 294
+CHECK_VALID_ROW:    0158 DEFINED AT LINE 329
+                    > USED AT LINE 222
+SINUS:              015D DEFINED AT LINE 335
+                    > USED AT LINE 356
+RETURN_TRUE_ROW:    0173 DEFINED AT LINE 359
+                    > USED AT LINE 341
+RETURN_FALSE_ROW:   0177 DEFINED AT LINE 364
+                    > USED AT LINE 352
+CHECK_VALID_FIELD:  017B DEFINED AT LINE 387
+                    > USED AT LINE 241
+STO:                0180 DEFINED AT LINE 393
+                    > USED AT LINE 451
+RETURN_TRUE_FIELD:  01BE DEFINED AT LINE 454
+                    > USED AT LINE 399
+RETURN_FALSE_FIELD: 01C2 DEFINED AT LINE 459
+                    > USED AT LINE 407
+                    > USED AT LINE 427
+                    > USED AT LINE 447
